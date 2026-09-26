@@ -265,7 +265,8 @@ def collect_subscribers(state: dict) -> set[str]:
     state["tg_offset"] = offset
     if r["result"]:
         tg("getUpdates", offset=offset, timeout=0)  # підтверджуємо, що звернення оброблено
-    for chat in welcome:
+    # Вітаємо лише тих, хто досі підписаний (/start і /stop могли прийти за одну добу).
+    for chat in dict.fromkeys(c for c in welcome if c in subs):
         text = WELCOME
         if state.get("last_report"):
             text += f"\n\nОстанній звіт ({state.get('last_report_date', '')}):\n\n" + state["last_report"]
@@ -555,7 +556,8 @@ def dobrozem_search(max_seen: int) -> tuple[list[dict], int] | None:
 
 def main() -> None:
     state = load_state()
-    collect_subscribers(state)
+    if not DRY_RUN:  # у пробному режимі нікому не відповідаємо і звернень не підтверджуємо
+        collect_subscribers(state)
     if SUBSCRIBERS_ONLY:
         if not DRY_RUN:
             save_state(state)
