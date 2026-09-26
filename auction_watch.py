@@ -16,17 +16,21 @@
 надсилається раз на SEND_EVERY_DAYS днів (перший запуск — одразу).
 
 Змінні середовища:
-  TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID  — куди надсилати (без них друкує в консоль);
-                   у TELEGRAM_CHAT_ID можна вказати кілька адрес через кому
+  TELEGRAM_BOT_TOKEN — токен бота; звіт отримують усі, хто написав боту /start
+                   (і канали/групи, куди бота додали адміністратором)
+  TELEGRAM_CHAT_ID — необов'язково: постійні адресати через кому (@канал, -100…)
   BACKFILL_DAYS    — на скільки днів назад читати при першому запуску (типово 30)
   REMIND_DAYS      — за скільки днів до кінця заявок нагадувати (типово 10)
   MIN_HECTARES     — мінімальна площа для OLX і Доброзему (типово 1.0)
   SEND_EVERY_DAYS  — як часто надсилати звіт, у днях (типово 3)
   FORCE_SEND=1     — надіслати накопичений звіт зараз
+  SUBSCRIBERS_ONLY=1 — лише забрати нові /start і /stop (запускається кожні 6 год)
   DRY_RUN=1        — нічого не надсилати і не зберігати стан, лише надрукувати
 """
 from __future__ import annotations
 
+import base64
+import hashlib
 import html
 import json
 import os
@@ -91,6 +95,7 @@ MIN_HECTARES = float(os.getenv("MIN_HECTARES", "1.0"))
 DRY_RUN = os.getenv("DRY_RUN") == "1"
 SEND_EVERY_DAYS = int(os.getenv("SEND_EVERY_DAYS", "3"))   # перевірка щодня, звіт раз на N днів
 FORCE_SEND = os.getenv("FORCE_SEND") == "1"               # надіслати звіт зараз, не чекаючи
+SUBSCRIBERS_ONLY = os.getenv("SUBSCRIBERS_ONLY") == "1"   # лише зібрати нові підписки (/start, /stop)
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (auction-watch; personal monitoring)",
            "Accept": "application/json"}
@@ -154,11 +159,48 @@ def save_state(state: dict) -> None:
                           encoding="utf-8")
 
 
-def send(text: str) -> None:
-    token, chat = os.getenv("TELEGRAM_BOT_TOKEN"), os.getenv("TELEGRAM_CHAT_ID")
-    if DRY_RUN or not token or not chat:
-        print("----- MESSAGE -----\n" + text + "\n-------------------")
-        return
+# ---------------------------------------------------------------- Telegram і підписники
+# Підписатися: написати боту /start (або додати бота адміністратором у канал/групу).
+# Відписатися: /stop. Список підписників лежить у state.json зашифрованим
+# (репозиторій публічний), ключ виводиться з TELEGRAM_BOT_TOKEN.
+
+
+def tg(method: str, **params):
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not token:
+        return None
+    try:
+        r = requests.post(f"https://api.telegram.org/bot{token}/{method}", data=params, timeout=30)
+        return r.json()
+    except (requests.RequestException, ValueError) as e:
+        print(f"Telegram {method}: {e}", file=sys.stderr)
+        return None
+
+
+def _fernet():
+    from cryptography.fernet import Fernet
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    key = base64.urlsafe_b64encode(hashlib.sha256(b"auction-watch:" + token.encode()).digest())
+    return Fernet(key)
+
+
+def load_subscribers(state: dict) -> set[str]:
+    blob = state.get("subscribers_enc")
+    if not blob or not os.getenv("TELEGRAM_BOT_TOKEN"):
+        return set()
+    try:
+        return set(json.loads(_fernet().decrypt(blob.encode())))
+    except Exception:  # інший токен або пошкоджені дані
+        print("Не вдалося розшифрувати список підписників (змінився токен?)", file=sys.stderr)
+        return set()
+
+
+def save_subscribers(state: dict, subs: set[str]) -> None:
+    if os.getenv("TELEGRAM_BOT_TOKEN"):
+        state["subscribers_enc"] = _fernet().encrypt(json.dumps(sorted(subs)).encode()).decode()
+
+
+def chunk_text(text: str) -> list[str]:
     # Telegram обмежує повідомлення 4096 символами — ріжемо по рядках.
     chunks, cur = [], ""
     for line in text.split("\n"):
@@ -168,17 +210,84 @@ def send(text: str) -> None:
         cur += line + "\n"
     if cur.strip():
         chunks.append(cur)
-    # TELEGRAM_CHAT_ID може містити кілька адрес через кому: особисті чати, групи,
-    # канали (@назва або -100…). Кожна отримує однаковий звіт.
-    recipients = [x for x in re.split(r"[,;\s]+", chat) if x]
-    for rcpt in recipients:
-        for c in chunks:
-            r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
-                              data={"chat_id": rcpt, "text": c, "parse_mode": "HTML",
-                                    "disable_web_page_preview": "true"}, timeout=30)
-            if r.status_code != 200:
-                print(f"Telegram error ({rcpt}):", r.text, file=sys.stderr)
-                break
+    return chunks
+
+
+def send_to(chat_id: str, text: str) -> bool:
+    """Надсилає текст одному адресату. False — якщо адресат недоступний (заблокував бота тощо)."""
+    for c in chunk_text(text):
+        r = tg("sendMessage", chat_id=chat_id, text=c, parse_mode="HTML",
+               disable_web_page_preview="true")
+        if not r or not r.get("ok"):
+            print(f"Telegram error ({chat_id}): {r}", file=sys.stderr)
+            return not (r and r.get("error_code") in (400, 403))
+    return True
+
+
+WELCOME = ("✅ Ви підписані на звіти про аукціони Prozorro, OLX і Доброзем по Городищенській "
+           "громаді та сусідніх селах. Звіт приходить раз на 3 дні. Відписатися: /stop")
+BYE = "Ви відписані. Щоб знову отримувати звіти, надішліть /start."
+
+
+def collect_subscribers(state: dict) -> set[str]:
+    """Забирає нові звернення до бота (Telegram зберігає їх 24 год) і оновлює підписників."""
+    subs = load_subscribers(state)
+    offset = int(state.get("tg_offset", 0))
+    r = tg("getUpdates", offset=offset, timeout=0,
+           allowed_updates=json.dumps(["message", "channel_post", "my_chat_member"]))
+    if not r or not r.get("ok"):
+        print(f"getUpdates: {r}", file=sys.stderr)
+        return subs
+    welcome = []
+    for u in r["result"]:
+        offset = max(offset, u["update_id"] + 1)
+        msg = u.get("message") or u.get("channel_post")
+        if msg:
+            chat = str(msg["chat"]["id"])
+            cmd = (msg.get("text") or "").split("@")[0].split()[0:1]
+            if cmd == ["/start"]:
+                if chat not in subs:
+                    welcome.append(chat)
+                subs.add(chat)
+            elif cmd == ["/stop"]:
+                subs.discard(chat)
+                send_to(chat, BYE)
+        mcm = u.get("my_chat_member")
+        if mcm:  # бота додали в канал/групу або прибрали звідти
+            chat = str(mcm["chat"]["id"])
+            status = mcm["new_chat_member"]["status"]
+            if status in ("administrator", "member") and mcm["chat"]["type"] != "private":
+                if chat not in subs:
+                    welcome.append(chat)
+                subs.add(chat)
+            elif status in ("left", "kicked"):
+                subs.discard(chat)
+    state["tg_offset"] = offset
+    if r["result"]:
+        tg("getUpdates", offset=offset, timeout=0)  # підтверджуємо, що звернення оброблено
+    for chat in welcome:
+        text = WELCOME
+        if state.get("last_report"):
+            text += f"\n\nОстанній звіт ({state.get('last_report_date', '')}):\n\n" + state["last_report"]
+        if not send_to(chat, text):
+            subs.discard(chat)
+    print(f"Підписників: {len(subs)} (нових: {len(welcome)})")
+    save_subscribers(state, subs)
+    return subs
+
+
+def send(text: str, state: dict | None = None) -> None:
+    """Однаковий звіт усім: підписникам і адресам із TELEGRAM_CHAT_ID (через кому)."""
+    fixed = [x for x in re.split(r"[,;\s]+", os.getenv("TELEGRAM_CHAT_ID", "")) if x]
+    subs = load_subscribers(state) if state is not None else set()
+    recipients = list(dict.fromkeys([*fixed, *sorted(subs)]))
+    if DRY_RUN or not os.getenv("TELEGRAM_BOT_TOKEN") or not recipients:
+        print(f"----- MESSAGE (адресатів: {len(recipients)}) -----\n" + text + "\n-------------------")
+        return
+    gone = {c for c in recipients if not send_to(c, text) and c in subs}
+    if gone and state is not None:  # заблокували бота — прибираємо з підписників
+        save_subscribers(state, subs - gone)
+    print(f"Звіт надіслано: {len(recipients) - len(gone)} адресатам")
 
 
 def esc(s: str) -> str:
@@ -446,6 +555,11 @@ def dobrozem_search(max_seen: int) -> tuple[list[dict], int] | None:
 
 def main() -> None:
     state = load_state()
+    collect_subscribers(state)
+    if SUBSCRIBERS_ONLY:
+        if not DRY_RUN:
+            save_state(state)
+        return
     first_run = not state.get("initialized")
     since = parse_dt(state.get("cursor")) or (now() - timedelta(days=BACKFILL_DAYS))
     pending = state.setdefault("pending", {"lots": [], "reminders": [], "olx": [], "dz": []})
@@ -496,7 +610,10 @@ def main() -> None:
     due = (first_run or FORCE_SEND or last_sent is None
            or t - last_sent >= timedelta(days=SEND_EVERY_DAYS) - timedelta(hours=3))
     if due:
-        send(build_report(state, pending, first_run, olx is None, dz is None))
+        report = build_report(state, pending, first_run, olx is None, dz is None)
+        send(report, state)
+        state["last_report"] = report
+        state["last_report_date"] = t.astimezone(ZoneInfo("Europe/Kyiv")).strftime("%d.%m.%Y")
         state["last_sent"] = t.isoformat()
         state["pending"] = {"lots": [], "reminders": [], "olx": [], "dz": []}
     else:
