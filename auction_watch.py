@@ -16,7 +16,8 @@
 надсилається раз на SEND_EVERY_DAYS днів (перший запуск — одразу).
 
 Змінні середовища:
-  TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID  — куди надсилати (без них друкує в консоль)
+  TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID  — куди надсилати (без них друкує в консоль);
+                   у TELEGRAM_CHAT_ID можна вказати кілька адрес через кому
   BACKFILL_DAYS    — на скільки днів назад читати при першому запуску (типово 30)
   REMIND_DAYS      — за скільки днів до кінця заявок нагадувати (типово 10)
   MIN_HECTARES     — мінімальна площа для OLX і Доброзему (типово 1.0)
@@ -167,12 +168,17 @@ def send(text: str) -> None:
         cur += line + "\n"
     if cur.strip():
         chunks.append(cur)
-    for c in chunks:
-        r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
-                          data={"chat_id": chat, "text": c, "parse_mode": "HTML",
-                                "disable_web_page_preview": "true"}, timeout=30)
-        if r.status_code != 200:
-            print("Telegram error:", r.text, file=sys.stderr)
+    # TELEGRAM_CHAT_ID може містити кілька адрес через кому: особисті чати, групи,
+    # канали (@назва або -100…). Кожна отримує однаковий звіт.
+    recipients = [x for x in re.split(r"[,;\s]+", chat) if x]
+    for rcpt in recipients:
+        for c in chunks:
+            r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                              data={"chat_id": rcpt, "text": c, "parse_mode": "HTML",
+                                    "disable_web_page_preview": "true"}, timeout=30)
+            if r.status_code != 200:
+                print(f"Telegram error ({rcpt}):", r.text, file=sys.stderr)
+                break
 
 
 def esc(s: str) -> str:
