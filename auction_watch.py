@@ -12,11 +12,16 @@
   5a. Те саме на Доброземі (dobrozem.com.ua, фільтр «Черкаська область»).
   6. Зберігає стан у state.json (workflow комітить його назад у репозиторій).
 
+Перевірка йде щодня, знахідки накопичуються в state["pending"], а звіт у Telegram
+надсилається раз на SEND_EVERY_DAYS днів (перший запуск — одразу).
+
 Змінні середовища:
   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID  — куди надсилати (без них друкує в консоль)
   BACKFILL_DAYS    — на скільки днів назад читати при першому запуску (типово 30)
   REMIND_DAYS      — за скільки днів до кінця заявок нагадувати (типово 10)
   MIN_HECTARES     — мінімальна площа для OLX і Доброзему (типово 1.0)
+  SEND_EVERY_DAYS  — як часто надсилати звіт, у днях (типово 3)
+  FORCE_SEND=1     — надіслати накопичений звіт зараз
   DRY_RUN=1        — нічого не надсилати і не зберігати стан, лише надрукувати
 """
 from __future__ import annotations
@@ -83,6 +88,8 @@ BACKFILL_DAYS = int(os.getenv("BACKFILL_DAYS", "30"))
 REMIND_DAYS = int(os.getenv("REMIND_DAYS", "10"))
 MIN_HECTARES = float(os.getenv("MIN_HECTARES", "1.0"))
 DRY_RUN = os.getenv("DRY_RUN") == "1"
+SEND_EVERY_DAYS = int(os.getenv("SEND_EVERY_DAYS", "3"))   # перевірка щодня, звіт раз на N днів
+FORCE_SEND = os.getenv("FORCE_SEND") == "1"               # надіслати звіт зараз, не чекаючи
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (auction-watch; personal monitoring)",
            "Accept": "application/json"}
@@ -435,20 +442,20 @@ def main() -> None:
     state = load_state()
     first_run = not state.get("initialized")
     since = parse_dt(state.get("cursor")) or (now() - timedelta(days=BACKFILL_DAYS))
+    pending = state.setdefault("pending", {"lots": [], "reminders": [], "olx": [], "dz": []})
 
     lots, cursor = fetch_changes(since)
 
-    new_lots, reminders = [], []
     for l in lots:
         known = state["lots"].get(l["id"])
         if known is None:
             state["lots"][l["id"]] = {**l, "reminded": False}
             if l["status"] in ACTIVE_STATUSES:
-                new_lots.append(l)
+                pending["lots"].append(l["id"])
         else:
             known.update({k: v for k, v in l.items()})
 
-    # Нагадування (один раз на лот) про кінець прийому заявок.
+    # Нагадування (один раз на лот) про кінець прийому заявок — ставимо в чергу.
     t = now()
     for lid, l in list(state["lots"].items()):
         dl = parse_dt(l.get("deadline"))
@@ -460,30 +467,61 @@ def main() -> None:
         if l.get("reminded") or l.get("status") not in ACTIVE_STATUSES:
             continue
         if t < dl <= t + timedelta(days=REMIND_DAYS):
-            reminders.append(l)
             l["reminded"] = True
-
-    # Лоти, про які щойно повідомили як про нові, окремим нагадуванням не дублюємо,
-    # але прапорець reminded вже стоїть — вдруге не прийде.
-    new_ids = {l["id"] for l in new_lots}
-    reminders = [l for l in reminders if l["id"] not in new_ids]
+            if lid not in pending["lots"]:
+                pending["reminders"].append(lid)
 
     olx = olx_search()
-    new_olx = []
     if olx is not None:
         seen = set(state.get("olx_seen", []))
-        new_olx = [o for o in olx if o["id"] not in seen]
+        pending["olx"] += [o for o in olx if o["id"] not in seen]
         state["olx_seen"] = sorted(seen | {o["id"] for o in olx})
 
     dz_seen = set(state.get("dobrozem_seen", []))
     res = dobrozem_search(int(state.get("dobrozem_max_id", 0)))
-    dz, new_dz = None, []
+    dz = None
     if res is not None:
         dz, state["dobrozem_max_id"] = res
-        new_dz = [d for d in dz if d["id"] not in dz_seen]
+        pending["dz"] += [d for d in dz if d["id"] not in dz_seen]
         state["dobrozem_seen"] = sorted(dz_seen | {d["id"] for d in dz})
 
-    # ---- звіт
+    # ---- чи час надсилати звіт
+    last_sent = parse_dt(state.get("last_sent"))
+    due = (first_run or FORCE_SEND or last_sent is None
+           or t - last_sent >= timedelta(days=SEND_EVERY_DAYS) - timedelta(hours=3))
+    if due:
+        send(build_report(state, pending, first_run, olx is None, dz is None))
+        state["last_sent"] = t.isoformat()
+        state["pending"] = {"lots": [], "reminders": [], "olx": [], "dz": []}
+    else:
+        n = sum(len(v) for v in pending.values())
+        print(f"Звіт не надсилаю (останній {last_sent:%d.%m %H:%M} UTC); у черзі {n} позицій.")
+
+    if not DRY_RUN:
+        state["cursor"] = cursor
+        state["initialized"] = True
+        save_state(state)
+
+
+def build_report(state: dict, pending: dict, first_run: bool, olx_failed: bool,
+                 dz_failed: bool) -> str:
+    t = now()
+
+    def still_open(lid: str) -> dict | None:
+        """Лот з актуальними даними, якщо він досі активний і строк заявок не минув."""
+        l = state["lots"].get(lid)
+        if not l or l.get("status") not in ACTIVE_STATUSES:
+            return None
+        dl = parse_dt(l.get("deadline"))
+        return l if (dl is None or dl > t) else None
+
+    new_lots = [l for l in map(still_open, dict.fromkeys(pending["lots"])) if l]
+    new_ids = {l["id"] for l in new_lots}
+    reminders = [l for l in map(still_open, dict.fromkeys(pending["reminders"]))
+                 if l and l["id"] not in new_ids]
+    new_olx = list({o["id"]: o for o in pending["olx"]}.values())
+    new_dz = list({d["id"]: d for d in pending["dz"]}.values())
+
     msg = []
     title = "Стартовий знімок: активні лоти" if first_run else "Нові аукціони"
     major = [l for l in new_lots if not is_minor(l)]
@@ -512,17 +550,13 @@ def main() -> None:
             msg.append(f"• <b>{esc(d['place'])}</b> · {d['area_ha']} га · {esc(d['price'] or '—')}{y}\n"
                        f"  {esc(d['address'])}\n  {DOBROZEM_URL.format(id=d['id'])}")
     if not msg:
-        msg.append("Prozorro/OLX/Доброзем: нових лотів і оголошень немає.")
-    if olx is None:
-        msg.append("\n(OLX цього разу не відповів — перевірю наступного запуску.)")
-    if dz is None:
-        msg.append("(Доброзем цього разу не відповів — перевірю наступного запуску.)")
-    send("\n".join(msg))
-
-    if not DRY_RUN:
-        state["cursor"] = cursor
-        state["initialized"] = True
-        save_state(state)
+        msg.append(f"Prozorro/OLX/Доброзем: за останні {SEND_EVERY_DAYS} дні нових лотів "
+                   f"і оголошень немає.")
+    if olx_failed:
+        msg.append("\n(OLX сьогодні не відповів — перевірю завтра.)")
+    if dz_failed:
+        msg.append("(Доброзем сьогодні не відповів — перевірю завтра.)")
+    return "\n".join(msg)
 
 
 if __name__ == "__main__":
