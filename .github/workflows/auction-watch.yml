@@ -1,0 +1,44 @@
+name: Prozorro + OLX watch
+
+on:
+  schedule:
+    # Раз на 3 дні о 06:40 UTC (08:40 у Цюриху влітку, 07:40 взимку)
+    - cron: "40 6 */3 * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # щоб закомітити state.json
+
+concurrency:
+  group: auction-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests
+
+      - name: Run watcher
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          BACKFILL_DAYS: "30"
+          REMIND_DAYS: "10"
+          MIN_HECTARES: "1"
+        run: python auction_watch.py
+
+      - name: Save state
+        run: |
+          git config user.name "auction-watch"
+          git config user.email "actions@users.noreply.github.com"
+          git add state.json
+          git diff --cached --quiet || git commit -m "Update auction-watch state"
+          git push
