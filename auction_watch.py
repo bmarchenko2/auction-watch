@@ -79,6 +79,14 @@ OLX_QUERIES = ["городище", "хлистунівка", "дирдин", "к
 OLX_CITY_RE = re.compile("|".join([*UNIQUE_PLACES.values(), *COMMON_PLACES.values(),
                                    r"^городище$"]), re.I)
 OLX_LAND_SALE_CATEGORY = 1608  # «Продаж землі»
+# OLX відхиляє запити з нетиповими заголовками — представляємося звичайним браузером.
+OLX_HEADERS = {
+    "User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+                   "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"),
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "uk-UA,uk;q=0.9,en;q=0.8",
+    "Referer": "https://www.olx.ua/uk/nedvizhimost/zemlya/prodazha-zemli/chk/",
+}
 
 API = "https://procedure.prozorro.sale/api/search/byDateModified/{date}?limit=100"
 AUCTION_URL = "https://prozorro.sale/auction/{id}"
@@ -133,14 +141,16 @@ def uk(v) -> str:
     return v or ""
 
 
-def get(url: str, params=None, tries: int = 4):
+def get(url: str, params=None, tries: int = 4, headers: dict | None = None):
     for i in range(tries):
         try:
-            r = requests.get(url, params=params, headers=HEADERS, timeout=60)
+            r = requests.get(url, params=params, headers=headers or HEADERS, timeout=60)
             if r.status_code == 200:
                 return r.json()
             if r.status_code in (403, 404):
-                print(f"  HTTP {r.status_code} for {r.url}", file=sys.stderr)
+                snippet = " ".join(r.text[:300].split())
+                print(f"  HTTP {r.status_code} for {r.url}\n  server={r.headers.get('server')} "
+                      f"body: {snippet}", file=sys.stderr)
                 return None
         except requests.RequestException as e:
             print(f"  error {e}", file=sys.stderr)
@@ -462,7 +472,8 @@ def olx_search() -> list[dict] | None:
     for q in OLX_QUERIES:
         for offset in range(0, 200, 50):
             data = get(OLX_API, params={"offset": offset, "limit": 50, "query": q,
-                                        "category_id": OLX_LAND_SALE_CATEGORY})
+                                        "category_id": OLX_LAND_SALE_CATEGORY},
+                       headers=OLX_HEADERS, tries=2)
             if data is None:
                 return None  # OLX заблокував запит — пропускаємо цей раз
             offers = data.get("data") or []
