@@ -413,14 +413,21 @@ def fmt_date(s: str | None) -> str:
     return d.astimezone(ZoneInfo("Europe/Kyiv")).strftime("%d.%m.%Y %H:%M")
 
 
+def fmt_day(s: str | None) -> str | None:
+    """Дата без часу (DD.MM.YYYY) за київським часом; None, якщо дати немає."""
+    d = parse_dt(s)
+    return d.astimezone(ZoneInfo("Europe/Kyiv")).strftime("%d.%m.%Y") if d else None
+
+
 def lot_line(l: dict) -> str:
     parts = [f"<b>{esc(l['place'])}</b> · {esc(l['kind'])}"]
     if l.get("area_ha"):
         parts.append(f"{l['area_ha']} га")
     parts.append(f"старт {fmt_money(l.get('price'))}")
     head = " · ".join(parts)
+    pub = f"Опубліковано {fmt_day(l.get('published'))} · " if l.get("published") else ""
     return (f"• {head}\n  {esc(l['title'])}\n"
-            f"  Заявки до {fmt_date(l.get('deadline'))}, торги {fmt_date(l.get('auction_date'))}\n"
+            f"  {pub}Заявки до {fmt_date(l.get('deadline'))}, торги {fmt_date(l.get('auction_date'))}\n"
             f"  {AUCTION_URL.format(id=l['id'])}")
 
 
@@ -471,7 +478,8 @@ def olx_search() -> list[dict] | None:
                 price = next((p.get("value", {}).get("label") for p in o.get("params", [])
                               if p.get("key") == "price"), None)
                 results[o["id"]] = {"id": o["id"], "title": o.get("title", ""), "city": city,
-                                    "area_ha": round(area, 4), "price": price, "url": o.get("url")}
+                                    "area_ha": round(area, 4), "price": price, "url": o.get("url"),
+                                    "created": o.get("created_time")}
             if len(offers) < 50:
                 break
     print(f"OLX: знайдено {len(results)} оголошень від {MIN_HECTARES} га")
@@ -495,6 +503,17 @@ def text_place(addr: str) -> str | None:
     if HOROD_RE.search(txt):
         return "Городище"
     return None
+
+
+def dobrozem_created(offer_id: str) -> str | None:
+    """Дата створення оголошення (DD.MM.YYYY) зі сторінки оголошення; у списку її немає."""
+    try:
+        r = requests.get(DOBROZEM_URL.format(id=offer_id),
+                         headers={**HEADERS, "Accept": "text/html"}, timeout=60)
+        m = re.search(r"Створено:\s*(?:<!-- -->)?\s*(\d{2}\.\d{2}\.\d{4})", r.text)
+        return m.group(1) if m else None
+    except requests.RequestException:
+        return None
 
 
 def parse_dobrozem(page_html: str) -> list[dict]:
@@ -605,7 +624,8 @@ def main() -> None:
     dz = None
     if res is not None:
         dz, state["dobrozem_max_id"] = res
-        pending["dz"] += [d for d in dz if d["id"] not in dz_seen]
+        pending["dz"] += [{**d, "created": dobrozem_created(d["id"])}
+                          for d in dz if d["id"] not in dz_seen]
         state["dobrozem_seen"] = sorted(dz_seen | {d["id"] for d in dz})
 
     # ---- чи час надсилати звіт
@@ -666,13 +686,15 @@ def build_report(state: dict, pending: dict, first_run: bool, olx_failed: bool,
         msg.append(f"\n🌾 <b>OLX: {'земля' if first_run else 'нова земля'} від "
                    f"{MIN_HECTARES:g} га ({len(new_olx)})</b>")
         for o in new_olx:
-            msg.append(f"• <b>{esc(o['city'])}</b> · {o['area_ha']} га · {esc(o['price'] or '—')}\n"
+            pub = f" · опубл. {fmt_day(o['created'])}" if o.get("created") else ""
+            msg.append(f"• <b>{esc(o['city'])}</b> · {o['area_ha']} га · {esc(o['price'] or '—')}{pub}\n"
                        f"  {esc(o['title'])}\n  {o['url']}")
     if new_dz:
         msg.append(f"\n🟩 <b>Доброзем: {'земля' if first_run else 'нова земля'} від "
                    f"{MIN_HECTARES:g} га ({len(new_dz)})</b>")
         for d in new_dz:
             y = f" · дохідність {d['yield']}%" if d.get("yield") else ""
+            y += f" · створено {d['created']}" if d.get("created") else ""
             msg.append(f"• <b>{esc(d['place'])}</b> · {d['area_ha']} га · {esc(d['price'] or '—')}{y}\n"
                        f"  {esc(d['address'])}\n  {DOBROZEM_URL.format(id=d['id'])}")
     if not msg:
