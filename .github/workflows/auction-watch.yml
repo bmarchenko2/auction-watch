@@ -2,15 +2,14 @@ name: Prozorro + OLX watch
 
 on:
   schedule:
-    # Щодня о 06:40 UTC (08:40 у Цюриху влітку, 07:40 взимку).
-    # Перевірка і звіт у Telegram — щодня (SEND_EVERY_DAYS: "1").
-    - cron: "40 6 * * *"
+    # Щодня о 14:00 UTC (16:00 за Цюрихом влітку, 15:00 взимку).
+    - cron: "0 14 * * *"
     # Кожні 6 год — лише забрати нові /start і /stop (Telegram зберігає їх 24 год).
     - cron: "15 */6 * * *"
   workflow_dispatch:
     inputs:
       force_send:
-        description: "Надіслати звіт одразу, не чекаючи ранкового запуску"
+        description: "Надіслати звіт одразу, не чекаючи 14:00 UTC"
         type: boolean
         default: true
 
