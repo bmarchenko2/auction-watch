@@ -42,6 +42,7 @@ jobs:
           REMIND_DAYS: "10"
           MIN_HECTARES: "1"
           SEND_EVERY_DAYS: "1"
+          OLX_ENABLED: "0"   # OLX блокує GitHub; його перевіряє olx_watch.py на Mac
           FORCE_SEND: ${{ inputs.force_send && '1' || '0' }}
           SUBSCRIBERS_ONLY: ${{ github.event.schedule == '15 */6 * * *' && '1' || '0' }}
         run: python auction_watch.py
