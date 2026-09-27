@@ -9,8 +9,8 @@ REPO_RAW="https://raw.githubusercontent.com/bmarchenko2/auction-watch/main"
 DIR="$HOME/Library/Application Support/auction-watch"
 LABEL="ua.auction-watch.olx"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-HOUR=8
-MINUTE=30
+HOUR=15
+MINUTE=50
 
 if [[ "${1:-}" == "--uninstall" ]]; then
   launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
