@@ -25,6 +25,7 @@
   SEND_EVERY_DAYS  — як часто надсилати звіт, у днях (типово 3; 1 — щодня)
   FORCE_SEND=1     — надіслати накопичений звіт зараз
   SUBSCRIBERS_ONLY=1 — лише забрати нові /start і /stop (запускається кожні 6 год)
+  OLX_ENABLED=0    — не перевіряти OLX (у GitHub Actions; OLX перевіряє olx_watch.py на Mac)
   DRY_RUN=1        — нічого не надсилати і не зберігати стан, лише надрукувати
 """
 from __future__ import annotations
@@ -104,6 +105,9 @@ DRY_RUN = os.getenv("DRY_RUN") == "1"
 SEND_EVERY_DAYS = int(os.getenv("SEND_EVERY_DAYS", "3"))   # перевірка щодня, звіт раз на N днів
 FORCE_SEND = os.getenv("FORCE_SEND") == "1"               # надіслати звіт зараз, не чекаючи
 SUBSCRIBERS_ONLY = os.getenv("SUBSCRIBERS_ONLY") == "1"   # лише зібрати нові підписки (/start, /stop)
+# OLX блокує сервери GitHub, тому в GitHub Actions його вимкнено (OLX_ENABLED=0),
+# а OLX перевіряє olx_watch.py на домашньому Mac.
+OLX_ENABLED = os.getenv("OLX_ENABLED", "1") == "1"
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (auction-watch; personal monitoring)",
            "Accept": "application/json"}
@@ -624,7 +628,7 @@ def main() -> None:
             if lid not in pending["lots"]:
                 pending["reminders"].append(lid)
 
-    olx = olx_search()
+    olx = olx_search() if OLX_ENABLED else []
     if olx is not None:
         seen = set(state.get("olx_seen", []))
         pending["olx"] += [o for o in olx if o["id"] not in seen]
@@ -710,7 +714,8 @@ def build_report(state: dict, pending: dict, first_run: bool, olx_failed: bool,
                        f"  {esc(d['address'])}\n  {DOBROZEM_URL.format(id=d['id'])}")
     if not msg:
         since = "за добу" if SEND_EVERY_DAYS == 1 else f"за останні {SEND_EVERY_DAYS} дні"
-        msg.append(f"Prozorro/OLX/Доброзем: {since} нових лотів і оголошень немає.")
+        sources = "Prozorro/OLX/Доброзем" if OLX_ENABLED else "Prozorro/Доброзем"
+        msg.append(f"{sources}: {since} нових лотів і оголошень немає.")
     if olx_failed:
         msg.append("\n(OLX сьогодні не відповів — перевірю завтра.)")
     if dz_failed:
