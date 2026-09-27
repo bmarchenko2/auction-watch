@@ -3,14 +3,14 @@ name: Prozorro + OLX watch
 on:
   schedule:
     # Щодня о 06:40 UTC (08:40 у Цюриху влітку, 07:40 взимку).
-    # Перевірка щодня, звіт у Telegram — раз на SEND_EVERY_DAYS днів.
+    # Перевірка і звіт у Telegram — щодня (SEND_EVERY_DAYS: "1").
     - cron: "40 6 * * *"
     # Кожні 6 год — лише забрати нові /start і /stop (Telegram зберігає їх 24 год).
     - cron: "15 */6 * * *"
   workflow_dispatch:
     inputs:
       force_send:
-        description: "Надіслати звіт одразу, не чекаючи 3 днів"
+        description: "Надіслати звіт одразу, не чекаючи ранкового запуску"
         type: boolean
         default: true
 
@@ -41,7 +41,7 @@ jobs:
           BACKFILL_DAYS: "30"
           REMIND_DAYS: "10"
           MIN_HECTARES: "1"
-          SEND_EVERY_DAYS: "3"
+          SEND_EVERY_DAYS: "1"
           FORCE_SEND: ${{ inputs.force_send && '1' || '0' }}
           SUBSCRIBERS_ONLY: ${{ github.event.schedule == '15 */6 * * *' && '1' || '0' }}
         run: python auction_watch.py
