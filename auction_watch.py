@@ -22,7 +22,7 @@
   BACKFILL_DAYS    — на скільки днів назад читати при першому запуску (типово 30)
   REMIND_DAYS      — за скільки днів до кінця заявок нагадувати (типово 10)
   MIN_HECTARES     — мінімальна площа для OLX і Доброзему (типово 1.0)
-  SEND_EVERY_DAYS  — як часто надсилати звіт, у днях (типово 3)
+  SEND_EVERY_DAYS  — як часто надсилати звіт, у днях (типово 3; 1 — щодня)
   FORCE_SEND=1     — надіслати накопичений звіт зараз
   SUBSCRIBERS_ONLY=1 — лише забрати нові /start і /stop (запускається кожні 6 год)
   DRY_RUN=1        — нічого не надсилати і не зберігати стан, лише надрукувати
@@ -224,8 +224,9 @@ def send_to(chat_id: str, text: str) -> bool:
     return True
 
 
+PERIOD = "щодня" if SEND_EVERY_DAYS == 1 else f"раз на {SEND_EVERY_DAYS} дні"
 WELCOME = ("✅ Ви підписані на звіти про аукціони Prozorro, OLX і Доброзем по Городищенській "
-           "громаді та сусідніх селах. Звіт приходить раз на 3 дні. Відписатися: /stop")
+           f"громаді та сусідніх селах. Звіт приходить {PERIOD}. Відписатися: /stop")
 BYE = "Ви відписані. Щоб знову отримувати звіти, надішліть /start."
 
 
@@ -675,13 +676,13 @@ def build_report(state: dict, pending: dict, first_run: bool, olx_failed: bool,
             msg.append(f"• <b>{esc(d['place'])}</b> · {d['area_ha']} га · {esc(d['price'] or '—')}{y}\n"
                        f"  {esc(d['address'])}\n  {DOBROZEM_URL.format(id=d['id'])}")
     if not msg:
-        msg.append(f"Prozorro/OLX/Доброзем: за останні {SEND_EVERY_DAYS} дні нових лотів "
-                   f"і оголошень немає.")
+        since = "за добу" if SEND_EVERY_DAYS == 1 else f"за останні {SEND_EVERY_DAYS} дні"
+        msg.append(f"Prozorro/OLX/Доброзем: {since} нових лотів і оголошень немає.")
     if olx_failed:
         msg.append("\n(OLX сьогодні не відповів — перевірю завтра.)")
     if dz_failed:
         msg.append("(Доброзем сьогодні не відповів — перевірю завтра.)")
-    return "\n".join(msg)
+    return "\n".join(msg).strip()
 
 
 if __name__ == "__main__":
