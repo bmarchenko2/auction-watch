@@ -1,5 +1,5 @@
 {
- "cursor": "2026-09-30T14:15:13.195000Z",
+ "cursor": "2026-10-01T14:13:46.513000Z",
  "dobrozem_max_id": 20885,
  "dobrozem_seen": [
   "L-000013739",
@@ -17,9 +17,9 @@
   "L-000020755"
  ],
  "initialized": true,
- "last_report": "🏷 <b>Нові аукціони (1)</b>\n• <b>Корсунь-Шевченківський</b> · банкрутство · старт 66 624 грн\n  аукціон з продажу майна банкрута - ЗАТ \"РОСЬ\" код 14187396 вул.30 років Перемоги, б.70, м.Черкаси, 18029\n  Опубліковано 19.08.2026 · Заявки до 01.10.2026 20:00, торги 02.10.2026 12:55\n  https://prozorro.sale/auction/BRE001-UA-20260819-32272",
- "last_report_date": "30.09.2026",
- "last_sent": "2026-09-30T14:15:32.140279+00:00",
+ "last_report": "Prozorro/Доброзем: за добу нових лотів і оголошень немає.",
+ "last_report_date": "01.10.2026",
+ "last_sent": "2026-10-01T14:14:54.152499+00:00",
  "lots": {
   "BRD001-UA-20260805-94870": {
    "address": "Корсунь-шевченківський район/м.корсунь-шевченківський, вул.Перехреста Віталія (колишня 2-го Українського фронту), буд.1;",
@@ -377,7 +377,7 @@
    "price": 332.0,
    "published": "2026-08-19T14:38:30.831000Z",
    "reminded": true,
-   "status": "active_tendering",
+   "status": "active_qualification",
    "title": "аукціон з продажу майна банкрута - ЗАТ \"РОСЬ\" код 14187396 вул.30 років Перемоги, б.70, м.Черкаси, 18029",
    "vat": false
   },
@@ -407,7 +407,7 @@
    "price": 3056.0,
    "published": "2026-08-19T14:22:34.513000Z",
    "reminded": true,
-   "status": "active_tendering",
+   "status": "active_qualification",
    "title": "аукціон з продажу майна банкрута - ЗАТ \"РОСЬ\" код 14187396 вул.30 років Перемоги, б.70, м.Черкаси, 18029",
    "vat": false
   },
@@ -467,7 +467,7 @@
    "price": 357600.0,
    "published": "2026-09-10T12:11:06.901000Z",
    "reminded": false,
-   "status": "active_qualification",
+   "status": "active_awarded",
    "title": "Щебінь фракції понад 10 до 20 мм включно ВП \"Хлистунівський кар'єр\"",
    "vat": true
   },
@@ -1544,6 +1544,6 @@
   "olx": [],
   "reminders": []
  },
- "subscribers_enc": "gAAAAABqvlLxN3DqAYbdV81ckxnzBeIEtv2wmIVpW6AyUebjPjX8CCO3xa5_o5dvN7P2RDMSGvr7xXC73hBbUFPz4J8IukmjfQ==",
+ "subscribers_enc": "gAAAAABqvmrPtZutNge4BR-bjb4dVY3UuYVdpHVSV63XBvbo0o21kO7gcyNK2Ur2Jw6a1dpr7oNvg1eK8hen4yLk0kyhB72wAg==",
  "tg_offset": 657084798
 }
