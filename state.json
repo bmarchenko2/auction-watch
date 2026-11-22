@@ -1,5 +1,5 @@
 {
- "cursor": "2026-11-21T20:15:48.075000Z",
+ "cursor": "2026-11-22T20:34:57.527000Z",
  "dobrozem_max_id": 22269,
  "dobrozem_seen": [
   "L-000013739",
@@ -20,8 +20,8 @@
  ],
  "initialized": true,
  "last_report": "Prozorro/Доброзем: за добу нових лотів і оголошень немає.",
- "last_report_date": "21.11.2026",
- "last_sent": "2026-11-21T20:23:05.971365+00:00",
+ "last_report_date": "22.11.2026",
+ "last_sent": "2026-11-22T20:35:51.135855+00:00",
  "lots": {
   "BRD001-UA-20261010-12243": {
    "address": "Корсунь-шевченківський район/м.корсунь-шевченківський, вул.Перехреста Віталія (колишня 2-го Українського фронту), буд.1;",
@@ -33,21 +33,6 @@
    "place": "Корсунь-Шевченківський",
    "price": 720.0,
    "published": "2026-10-10T13:58:40.739000Z",
-   "reminded": true,
-   "status": "complete",
-   "title": "аукціон з продажу майна банкрута - ЗАТ \"РОСЬ\" код 14187396 вул.30 років Перемоги, б.70, м.Черкаси, 18029",
-   "vat": false
-  },
-  "BRD001-UA-20261010-26702": {
-   "address": "Корсунь-шевченківський район/м.корсунь-шевченківський, вул.Перехреста Віталія (колишня 2-го Українського фронту), буд.1;",
-   "area_ha": null,
-   "auction_date": "2026-10-23T06:35:00.000000Z",
-   "deadline": "2026-10-23T13:20:00.000000Z",
-   "id": "BRD001-UA-20261010-26702",
-   "kind": "банкрутство",
-   "place": "Корсунь-Шевченківський",
-   "price": 8952.0,
-   "published": "2026-10-10T14:10:27.109000Z",
    "reminded": true,
    "status": "complete",
    "title": "аукціон з продажу майна банкрута - ЗАТ \"РОСЬ\" код 14187396 вул.30 років Перемоги, б.70, м.Черкаси, 18029",
@@ -199,7 +184,7 @@
    "price": 8550.0,
    "published": "2026-11-02T09:53:39.842000Z",
    "reminded": true,
-   "status": "active_tendering",
+   "status": "active_auction",
    "title": "аукціон з продажу майна банкрута - ЗАТ \"РОСЬ\" код 14187396 вул.30 років Перемоги, б.70, м.Черкаси, 18029",
    "vat": false
   },
@@ -1006,6 +991,6 @@
   "olx": [],
   "reminders": []
  },
- "subscribers_enc": "gAAAAABrA0LsIlmg6sH1ubKkCs64jrZgasujzadQMl39nK2K8l2qR9mkfvNTEYsslXGF4qRXeqVKE3UTGAwOHqPp0F6gj-HRylrj_BJmTRG5iqDka4E2S7aSkijVaac5Gazg83FDzZV6",
+ "subscribers_enc": "gAAAAABrA1IiuK8oqPnKp56gUpbv3sVmQCFwZklhnrCIJCBL1iMAKSD08BvZ45abk7gMOIPSK861OLhYcnoxg-WKf5iJGD1Kcd71ns3COUA621tNlymWTEEyFPtRBgybl8sIrdw5P-dV",
  "tg_offset": 657084803
 }
