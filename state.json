@@ -1,6 +1,6 @@
 {
- "cursor": "2026-11-22T20:34:57.527000Z",
- "dobrozem_max_id": 22269,
+ "cursor": "2026-11-23T23:49:49.617000Z",
+ "dobrozem_max_id": 22313,
  "dobrozem_seen": [
   "L-000013739",
   "L-000016025",
@@ -20,8 +20,8 @@
  ],
  "initialized": true,
  "last_report": "Prozorro/Доброзем: за добу нових лотів і оголошень немає.",
- "last_report_date": "22.11.2026",
- "last_sent": "2026-11-22T20:35:51.135855+00:00",
+ "last_report_date": "24.11.2026",
+ "last_sent": "2026-11-24T01:29:37.842078+00:00",
  "lots": {
   "BRD001-UA-20261010-12243": {
    "address": "Корсунь-шевченківський район/м.корсунь-шевченківський, вул.Перехреста Віталія (колишня 2-го Українського фронту), буд.1;",
@@ -79,7 +79,7 @@
    "price": 45738.0,
    "published": "2026-10-19T07:36:38.065000Z",
    "reminded": true,
-   "status": "active_qualification",
+   "status": "pending_payment",
    "title": "аукціон з продажу майна банкрута - ЗАТ \"РОСЬ\" код 14187396 вул.30 років Перемоги, б.70, м.Черкаси, 18029",
    "vat": false
   },
@@ -184,7 +184,7 @@
    "price": 8550.0,
    "published": "2026-11-02T09:53:39.842000Z",
    "reminded": true,
-   "status": "active_auction",
+   "status": "active_qualification",
    "title": "аукціон з продажу майна банкрута - ЗАТ \"РОСЬ\" код 14187396 вул.30 років Перемоги, б.70, м.Черкаси, 18029",
    "vat": false
   },
@@ -199,7 +199,7 @@
    "price": 198.0,
    "published": "2026-11-02T10:08:49.256000Z",
    "reminded": true,
-   "status": "active_tendering",
+   "status": "active_auction",
    "title": "аукціон з продажу майна банкрута - ЗАТ \"РОСЬ\" код 14187396 вул.30 років Перемоги, б.70, м.Черкаси, 18029",
    "vat": false
   },
@@ -214,7 +214,7 @@
    "price": 3000.0,
    "published": "2026-11-02T10:09:54.278000Z",
    "reminded": true,
-   "status": "active_tendering",
+   "status": "active_auction",
    "title": "аукціон з продажу майна банкрута - ЗАТ \"РОСЬ\" код 14187396 вул.30 років Перемоги, б.70, м.Черкаси, 18029",
    "vat": false
   },
@@ -991,6 +991,6 @@
   "olx": [],
   "reminders": []
  },
- "subscribers_enc": "gAAAAABrBNDPyYSnDPuxQMzeyINJBfY7Z7t38Q60RxzfAAFUvia7hIT15pHh7sg8AxFdvpPnylkfemHRaPIaZVtqQgeD_5G8_AWlxm-wjiOJu4dlBoCIXZkxq5FFi09QQ83hCvUXIO8a",
+ "subscribers_enc": "gAAAAABrBOh1tYAjT_98M_8G_pJCn7kJicv87BMSnjcgEYeFn7b0jgjpdpIukiYgsvk7jHqT5cNXBf6lKZO2WxXU7mZlcE6GIe-Y1pzMelLsvTqMzMBk76sk46rge85jn0rPkGLdsN8H",
  "tg_offset": 657084803
 }
